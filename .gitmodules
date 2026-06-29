@@ -1,0 +1,3 @@
+[submodule "football-cdf"]
+	path = football-cdf
+	url = https://github.com/leemingo/football-cdf.git
