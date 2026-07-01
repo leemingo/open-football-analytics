@@ -1,46 +1,131 @@
-# xT (expected Threat) Pipeline
+# xThreat
 
-Action-based **expected Threat (xT)** for SkillCorner Dynamic Events, in the Karun Singh
-style: a pitch grid where each cell holds the probability that possession there eventually
-leads to a goal, so a pass/carry's value is the change in cell value between its start and end.
+Action-based **expected Threat (xT)** utilities for SkillCorner Dynamic Events.
 
-See the repo-level [README](../README.md) for data sources (open vs licensed) and the
-tutorial-vs-analysis split.
+xT values a pass or carry by the change in expected possession value between the
+start and end locations. The model in this directory learns a pitch grid through
+value iteration in the Karun Singh style.
 
-## Directory Layout
+## Tutorial And Analysis
 
-```text
-xthreat/
-  skillcorner_actions.py        # build the action table (pass / carry / shot) from Dynamic Events
-  bepro_actions.py              # build a Bepro action table from the canonical SPADL store
-  xthreat_model.py              # CenterOriginExpectedThreat (learned grid) + PrecomputedXThreat (load a published map)
-  xthreat_analysis.py           # routes, sequences, credit assignment, team/player summaries
-  xthreat_plots.py              # xT surface, heatmaps, sequence/route plots (mplsoccer)
-  run_xthreat.py    # end-to-end run + comparison against SkillCorner-provided xT
-  scripts/run_xthreat_experiment.sh
-  notebooks/
-    xthreat_analysis.ipynb   # pipeline walkthrough on licensed K League data
-    00_xthreat_from_scratch.ipynb           # open-data tutorial: build the xT surface inline (value iteration)
+| Resource | Link |
+|---|---|
+| Tutorial notebook | `xthreat/notebooks/xthreat_tutorial.ipynb` |
+| Example analysis | [Week 3: xT analysis](https://kaisport.github.io/posts/week3-xt-en.html) |
+
+The notebook builds pass/carry/shot actions directly from SkillCorner Dynamic
+Events, learns an xT grid, scores successful moves, compares pass xT vs carry
+xT, inspects the top creator's routes, and animates one long carry using
+tracking data.
+
+## Input Data
+
+The default tutorial input is the public
+[SkillCorner Open Data](https://github.com/SkillCorner/opendata) sample.
+
+For local data, point the scripts or notebook to a SkillCorner match-bundle root:
+
+```bash
+export SKILLCORNER_ROOT=/path/to/skillcorner/matches
 ```
 
-Generated data and surfaces are kept outside the package under `tmp/data/` (gitignored).
+## Action Definition
 
-## What it does
+SkillCorner Dynamic Events are converted into:
 
-1. **Actions** — `skillcorner_actions.build_skillcorner_xthreat_actions` turns Dynamic Events
-   into a pass/carry/shot action table with start/end coordinates (centre-origin, 105×68 m).
-   `bepro_actions.build_bepro_xthreat_actions` does the same for the Bepro K League SPADL
-   store built by `pipelines/bepro_ingest.py`; SPADL `dribble` actions are mapped to xT
-   `carry` rows so xG, xPass, and xT share the same football-cdf-derived source of truth.
-2. **Surface** — `CenterOriginExpectedThreat` learns the xT grid by value iteration; a
-   published map can also be loaded via `PrecomputedXThreat` for comparison.
-3. **Rating** — each action is scored by `xT_end − xT_start`; aggregated to team/player level
-   and compared against SkillCorner's **provided** xT as a benchmark.
+| xT action | Source |
+|---|---|
+| pass | `event_type == "player_possession"` and `end_type == "pass"` |
+| carry | `carry == true`, or the same `player_possession` row moves at least `carry_min_distance` meters from start coordinates to end coordinates |
+| shot | `event_type == "player_possession"` and `end_type == "shot"` |
 
-## Tutorials vs analysis
+The carry fallback is intentionally row-local: it compares `x_start, y_start`
+and `x_end, y_end` from the same player-possession row, so it does not join two
+different players' actions.
 
-- **Analysis** (`xthreat_analysis.ipynb`, `run_xthreat.py`) runs on
-  the licensed SkillCorner K League data and is the path used for internal analysis.
-- **Tutorial** (`00_xthreat_from_scratch.ipynb`) builds the xT surface from scratch on the
-  public SkillCorner Open Data (`DATA_SOURCE` toggle, default `"opendata"`) via inline value
-  iteration, then bridges to the modules above (verifies it matches `CenterOriginExpectedThreat`).
+Coordinates are represented on a center-origin 105 x 68 meter pitch, with event
+locations treated as attacking left to right.
+
+## Model Overview
+
+The xT workflow:
+
+1. Build an action table with pass, carry, and shot rows.
+2. Estimate per-cell shot probability, move probability, scoring probability,
+   and successful-move transition probabilities.
+3. Learn the xT grid through value iteration.
+4. Score successful passes and carries with:
+
+```text
+xT added = xT(destination) - xT(origin)
+```
+
+Reusable code lives in:
+
+```text
+skillcorner_actions.py
+xthreat_model.py
+train_skillcorner_xthreat.py
+xthreat_plots.py
+```
+
+## Build An Action Table
+
+Download the public SkillCorner Open Data files needed by this workflow and
+write the action table:
+
+```bash
+python -m xthreat.skillcorner_actions \
+  --download-opendata \
+  --opendata-out-dir /path/to/output/skillcorner_opendata \
+  --out /path/to/output/skillcorner_xthreat/actions.parquet
+```
+
+If you already have the Open Data repo locally, pass the match root instead:
+
+```bash
+python -m xthreat.skillcorner_actions \
+  --skillcorner-root /path/to/opendata/data/matches \
+  --out /path/to/output/skillcorner_xthreat/actions.parquet
+```
+
+The same command also works with a local SkillCorner match-bundle root containing
+`matches_index.csv`, or folders such as `{match_id}/dynamic_events.csv` plus
+`match_meta.json`.
+
+## Fit And Score xT
+
+```bash
+python -m xthreat.train_skillcorner_xthreat \
+  --actions /path/to/output/skillcorner_xthreat/actions.parquet \
+  --out-dir /path/to/output/skillcorner_xthreat
+```
+
+Model outputs are written to the configured output directory:
+
+```text
+actions.parquet
+actions.summary.json
+skillcorner_xthreat_model.joblib
+scored_actions.parquet
+surface.json
+metrics.json
+team_xthreat.csv
+player_xthreat.csv
+```
+
+## Tracking Animation Note
+
+The tutorial can animate the longest carry for the selected top xT creator.
+SkillCorner Open Data tracking files are Git LFS objects, so the notebook uses
+GitHub's media endpoint and validates that the downloaded file is real JSONL
+rather than a small LFS pointer file.
+
+If you cloned SkillCorner Open Data locally, run `git lfs pull` before pointing
+the notebook at that local data.
+
+## Caveats
+
+SkillCorner Open Data is a small public sample. The learned surface is useful as
+a transparent tutorial model, but robust xT evaluation should use a larger local
+dataset and carefully reviewed action definitions.

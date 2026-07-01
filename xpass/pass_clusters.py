@@ -14,25 +14,18 @@ from xpass.xpass_features import SKILLCORNER_XPASS_COLUMN, TARGET_COLUMN
 
 
 PASS_CLUSTER_ORDER = [
-    "짧은 횡패스",
-    "후방 빌드업 패스",
-    "전진 패스",
-    "측면 전개 패스",
-    "반대 전환 패스",
-    "박스 진입 패스",
-    "침투 패스",
-    "롱패스",
+    "Short lateral pass",
+    "Build-up pass",
+    "Progressive pass",
+    "Wide progression pass",
+    "Switch of play",
+    "Box entry pass",
+    "Penetrative pass",
+    "Long pass",
 ]
 
 PASS_CLUSTER_LABELS_EN = {
-    "짧은 횡패스": "Short lateral pass",
-    "후방 빌드업 패스": "Build-up pass",
-    "전진 패스": "Progressive pass",
-    "측면 전개 패스": "Wide progression pass",
-    "반대 전환 패스": "Switch of play",
-    "박스 진입 패스": "Box entry pass",
-    "침투 패스": "Penetrative pass",
-    "롱패스": "Long pass",
+    label: label for label in PASS_CLUSTER_ORDER
 }
 
 SOURCE_XPASS_COLUMNS = {
@@ -186,16 +179,16 @@ def add_pass_cluster_features(passes: pd.DataFrame) -> pd.DataFrame:
         & (progression.abs().le(7.0) | direction.str.contains("sideway", regex=False))
     )
 
-    labels = np.full(len(out), "짧은 횡패스", dtype=object)
+    labels = np.full(len(out), "Short lateral pass", dtype=object)
     rules = [
-        ("박스 진입 패스", box_entry),
-        ("침투 패스", penetration),
-        ("반대 전환 패스", switch),
-        ("롱패스", long_pass),
-        ("측면 전개 패스", wide_progression),
-        ("전진 패스", forward_pass),
-        ("후방 빌드업 패스", build_up),
-        ("짧은 횡패스", short_lateral),
+        ("Box entry pass", box_entry),
+        ("Penetrative pass", penetration),
+        ("Switch of play", switch),
+        ("Long pass", long_pass),
+        ("Wide progression pass", wide_progression),
+        ("Progressive pass", forward_pass),
+        ("Build-up pass", build_up),
+        ("Short lateral pass", short_lateral),
     ]
     assigned = pd.Series(False, index=out.index)
     for label, mask in rules:
@@ -206,9 +199,9 @@ def add_pass_cluster_features(passes: pd.DataFrame) -> pd.DataFrame:
     fallback_long = ~assigned & long_pass.fillna(False)
     fallback_forward = ~assigned & ~fallback_long & progression.ge(8.0).fillna(False)
     fallback_build = ~assigned & ~fallback_long & ~fallback_forward & passer_x.le(-10.0).fillna(False)
-    labels[np.asarray(fallback_long)] = "롱패스"
-    labels[np.asarray(fallback_forward)] = "전진 패스"
-    labels[np.asarray(fallback_build)] = "후방 빌드업 패스"
+    labels[np.asarray(fallback_long)] = "Long pass"
+    labels[np.asarray(fallback_forward)] = "Progressive pass"
+    labels[np.asarray(fallback_build)] = "Build-up pass"
 
     out["pass_cluster"] = pd.Categorical(labels, categories=PASS_CLUSTER_ORDER, ordered=True)
     out["pass_cluster_reason"] = out["pass_cluster"].astype("string")

@@ -19,7 +19,7 @@ except ModuleNotFoundError:
 from xthreat.xthreat_model import get_cell_indexes_center
 
 
-DEFAULT_OUTPUT = Path("tmp/data/bepro_drive_xthreat_k1/interactive/team_danger_zones_2025.html")
+DEFAULT_OUTPUT = Path("tmp/data/skillcorner_xthreat/interactive/team_danger_zones.html")
 MOVE_ACTIONS = ["pass", "carry"]
 
 
@@ -787,7 +787,7 @@ def write_team_danger_zone_html(
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a standalone team danger-zone xT HTML.")
-    parser.add_argument("--scored-path", type=Path, default=Path("tmp/data/bepro_drive_xthreat_k1/scored_actions_set_piece_included.parquet"))
+    parser.add_argument("--scored-path", type=Path, default=Path("tmp/data/skillcorner_xthreat/scored_actions.parquet"))
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--season", default="2025")
     parser.add_argument("--value-col", default="custom_xT_added")

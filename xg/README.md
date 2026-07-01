@@ -1,59 +1,114 @@
-# xG (expected Goals) Pipeline
+# xG
 
-Shot-level **xG** for SkillCorner Dynamic Events and Bepro K League events. Estimates the
-probability a shot becomes a goal from its location, geometry, and context.
+Shot-level **expected Goals (xG)** for SkillCorner Dynamic Events.
 
-See the repo-level [README](../README.md) for data sources (open vs licensed) and the
-tutorial-vs-analysis split.
+This directory contains a self-contained tutorial and reusable model-building
+utilities. The tutorial uses SkillCorner Open Data by default, while the Python
+modules can be pointed at a local SkillCorner match-bundle root.
 
-## Directory Layout
+## Tutorial And Analysis
 
-```text
-xg/
-  xg_features.py             # shot-level feature engineering (distance, open angle, in-box, ...)
-  train_skillcorner_xg.py    # logistic / XGBoost / LightGBM training + evaluation + calibration
-  xg_surface.py              # location xG surface plotting (mplsoccer)
-  skillcorner_shots.py       # build the shot table from SkillCorner Dynamic Events (licensed K League)
-  bepro_drive_shots.py       # build the shot table from Bepro events on Google Drive (rclone)
-  bepro_drive_players.py     # player-name/position lookup for Bepro shots
-  week1_report.py      # regenerate the published week1-xg post figures (Seoul/Ulsan story)
-  notebooks/                               # two notebooks:
-    00_xg_from_scratch.ipynb               # (1) TUTORIAL + simple analysis — build xG inline on open data (DATA_SOURCE toggle)
-    week1_xg_analysis.ipynb                # (2) reproduce the published week1-xg analyses (runs week1_report.py)
-```
+| Resource | Link |
+|---|---|
+| Tutorial notebook | `xg/notebooks/xg_tutorial.ipynb` |
+| Example analysis | [Week 1: xG analysis](https://kaisport.github.io/posts/week1-xg-en.html) |
 
-Generated data/models (`tmp/data/`) and report outputs (`reports/`, written by `week1_report.py`)
-are gitignored; the published week1-xg figures live on the KAISport site.
+The notebook is intentionally self-contained: it builds the shot table, creates
+core features, trains compact models, compares a module-rich feature pipeline,
+and visualizes both smooth logistic and compact XGBoost xG surfaces.
 
-## Shot definition
+## Input Data
 
-Both vendors converge to a centre-origin, attacker-left-to-right frame (goal at `(+52.5, 0)`).
+The default tutorial input is the public
+[SkillCorner Open Data](https://github.com/SkillCorner/opendata) sample.
 
-- **SkillCorner**: `event_type == "player_possession"` and `end_type == "shot"`;
-  goal `= game_interruption_after == "goal_for"`.
-- **Bepro**: an event whose `event_types` contains a `Shot`; goal `= outcome == "Goal"`.
-
-## Tutorial (open data — reproducible by anyone)
-
-`notebooks/00_xg_from_scratch.ipynb` implements xG inline (distance/angle features → XGBoost →
-log loss / Brier / calibration → xG surface) and then verifies it matches the modules below.
-A `DATA_SOURCE` toggle switches between public SkillCorner Open Data (`"opendata"`, default —
-auto-downloaded, fully reproducible) and licensed K League (`"kleague"`).
-
-## Analysis (licensed data — post reproduction)
+For local data, point the scripts or notebook to a SkillCorner match-bundle root:
 
 ```bash
-# SkillCorner K League shot table
-python -m xg.skillcorner_shots --skillcorner-root /data2/MHL/data/skillcorner/kleague \
-  --season-names 2023 2024 2025 --out tmp/data/skillcorner_xg/shots.parquet
-
-# Train + compare models
-python -m xg.train_skillcorner_xg --shots tmp/data/skillcorner_xg/shots.parquet \
-  --train-seasons 2023 2024 --test-seasons 2025 --models logistic xgboost lightgbm
-
-# Regenerate the published week1-xg figures (Bepro data)
-python -m xg.week1_report   # reads tmp/data/bepro_drive_xg_k1 -> reports/bepro_week1
+export SKILLCORNER_ROOT=/path/to/skillcorner/matches
 ```
 
-`train_skillcorner_xg` writes `scored_shots.parquet` (best model by validation log loss),
-`metrics.json`, `model_comparison.csv`, and per-model artefacts under the output dir.
+## Shot Definition
+
+SkillCorner Dynamic Events are converted into shots with:
+
+```text
+event_type == "player_possession" and end_type == "shot"
+```
+
+The target is:
+
+```text
+goal = game_interruption_after == "goal_for"
+```
+
+Coordinates are represented on a center-origin 105 x 68 meter pitch, with event
+locations treated as attacking left to right.
+
+## Feature And Model Overview
+
+The tutorial shows three levels of xG modelling:
+
+| Model | Purpose |
+|---|---|
+| `distance + angle` compact model | The minimum geometry baseline. |
+| `distance + angle + in_box + header` compact model | A readable tree-based extension used for surface comparison. |
+| module-rich pipeline | The reusable feature set from `xg_features.py`, with geometry, movement, possession context, defensive-line context, phase/game-state fields, and categorical descriptors where available. |
+
+For visualization, the notebook compares:
+
+- a smooth logistic surface based on `distance_to_goal` and `shot_angle`
+- a compact XGBoost surface that can reveal blocky/non-monotonic artifacts on
+  small public samples
+
+The richer reusable pipeline is implemented in:
+
+```text
+xg_features.py
+train_skillcorner_xg.py
+xg_surface.py
+```
+
+## Build A Shot Table
+
+```bash
+python -m xg.skillcorner_shots \
+  --skillcorner-root /path/to/skillcorner/matches \
+  --out /path/to/output/skillcorner_xg/shots.parquet
+```
+
+Optional filters:
+
+```bash
+python -m xg.skillcorner_shots \
+  --skillcorner-root /path/to/skillcorner/matches \
+  --season-names 2023 2024 \
+  --limit-matches 20 \
+  --out /path/to/output/skillcorner_xg/shots.parquet
+```
+
+## Train Models
+
+```bash
+python -m xg.train_skillcorner_xg \
+  --shots /path/to/output/skillcorner_xg/shots.parquet \
+  --train-seasons 2023 \
+  --test-seasons 2024 \
+  --models logistic xgboost lightgbm
+```
+
+Model outputs are written to the configured output directory:
+
+```text
+skillcorner_xg_best.joblib
+scored_shots.parquet
+metrics.json
+model_comparison.csv
+model_coefficients.csv
+```
+
+## Caveats
+
+SkillCorner Open Data is a small public sample. It is excellent for inspecting
+the workflow, but a stable production xG model should be trained and validated
+on a larger local dataset with carefully chosen train/test splits.

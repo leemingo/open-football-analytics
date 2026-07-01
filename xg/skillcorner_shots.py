@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -25,11 +26,12 @@ import numpy as np
 import pandas as pd
 
 from football_cdf.constants import CDF_PERIOD_MAP, PITCH_X, PITCH_Y
-from football_cdf.skillcorner_api import META_FILENAMES, find_match_dir
+from football_cdf.skillcorner_paths import META_FILENAMES, find_match_dir
 from football_cdf.skillcorner_preprocessing import SkillcornerDataPreprocessor
 
 
-DEFAULT_SKILLCORNER_ROOT = Path("/data2/MHL/data/skillcorner/kleague")
+SKILLCORNER_ROOT_ENV = "SKILLCORNER_ROOT"
+DEFAULT_SKILLCORNER_ROOT = os.environ.get(SKILLCORNER_ROOT_ENV)
 DEFAULT_OUTPUT_DIR = Path("tmp/data/skillcorner_xg")
 DEFAULT_SHOTS_PATH = DEFAULT_OUTPUT_DIR / "shots.parquet"
 
@@ -184,6 +186,14 @@ SET_PIECE_START_TYPES = {
 }
 
 
+def _resolve_skillcorner_root(skillcorner_root: str | Path | None) -> Path:
+    if skillcorner_root is None:
+        raise ValueError(
+            f"SkillCorner data root is required. Pass --skillcorner-root or set {SKILLCORNER_ROOT_ENV}."
+        )
+    return Path(skillcorner_root)
+
+
 @dataclass(frozen=True)
 class MatchContext:
     """Metadata needed to normalize one SkillCorner match."""
@@ -211,13 +221,13 @@ def _load_json(path: Path) -> dict:
 
 
 def resolve_match_context(
-    skillcorner_root: str | Path,
+    skillcorner_root: str | Path | None,
     match_id: str | int,
     *,
     match_dir: str | Path | None = None,
 ) -> MatchContext:
     """Resolve match paths and metadata using the project SkillCorner parser."""
-    root = Path(skillcorner_root)
+    root = _resolve_skillcorner_root(skillcorner_root)
     match_id_str = str(match_id)
 
     if match_dir is not None and Path(match_dir).exists():
@@ -249,13 +259,13 @@ def resolve_match_context(
 
 
 def load_match_index(
-    skillcorner_root: str | Path = DEFAULT_SKILLCORNER_ROOT,
+    skillcorner_root: str | Path | None = DEFAULT_SKILLCORNER_ROOT,
     *,
     season_names: Iterable[str] | None = None,
     include_non_closed: bool = False,
 ) -> pd.DataFrame:
     """Load the SkillCorner ``matches_index.csv`` with optional filtering."""
-    root = Path(skillcorner_root)
+    root = _resolve_skillcorner_root(skillcorner_root)
     index_path = root / "matches_index.csv"
     if not index_path.exists():
         raise FileNotFoundError(f"Missing SkillCorner matches index: {index_path}")
@@ -431,7 +441,7 @@ def _prepare_match_shots(
 
 
 def build_skillcorner_shot_table(
-    skillcorner_root: str | Path = DEFAULT_SKILLCORNER_ROOT,
+    skillcorner_root: str | Path | None = DEFAULT_SKILLCORNER_ROOT,
     *,
     season_names: Iterable[str] | None = None,
     include_non_closed: bool = False,
@@ -503,7 +513,13 @@ def write_shot_table(shots: pd.DataFrame, out_path: str | Path = DEFAULT_SHOTS_P
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build SkillCorner shot table for xG modelling.")
-    parser.add_argument("--skillcorner-root", type=Path, default=DEFAULT_SKILLCORNER_ROOT)
+    parser.add_argument(
+        "--skillcorner-root",
+        type=Path,
+        default=DEFAULT_SKILLCORNER_ROOT,
+        required=DEFAULT_SKILLCORNER_ROOT is None,
+        help=f"Directory containing SkillCorner match bundles. Can also be set via {SKILLCORNER_ROOT_ENV}.",
+    )
     parser.add_argument("--out", type=Path, default=DEFAULT_SHOTS_PATH)
     parser.add_argument("--season-names", nargs="*", default=None, help="Optional season filters, e.g. 2023 2024 2025")
     parser.add_argument("--include-non-closed", action="store_true")

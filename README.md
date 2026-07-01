@@ -1,76 +1,41 @@
-# football-analytics
+# open-football-analytics
 
-K League football analytics — **expected Goals (xG)**, **expected Pass (xPass)**, and
-**expected Threat (xT)**.
+Open, reproducible football analytics tutorials and utilities built on public
+event and tracking data. The current examples cover **expected Goals (xG)**,
+**expected Pass (xPass)**, and **expected Threat (xT)**, with the project
+designed to grow into a broader collection of football metrics.
 
-This repo serves two purposes:
+The repository is built around a simple workflow:
 
-1. **Analysis** — reproduce the figures behind the KAISports K League blog posts
-   (<https://kaisport.github.io/insights.html>) from licensed SkillCorner / Bepro data.
-2. **Open tutorials** — learn and re-implement each metric *from scratch* on the **public
-   SkillCorner Open Data**, so anyone can reproduce the methods without licensed data.
+1. Use `football-cdf` to normalize raw provider event/tracking data into the
+   Common Data Format (CDF), following
+   [Anzer et al., "Common Data Format (CDF): A Standardized Format for
+   Match-Data in Football (Soccer)"](https://arxiv.org/abs/2505.15820).
+2. Use the public [SkillCorner Open Data](https://github.com/SkillCorner/opendata)
+   sample as the default reproducible dataset.
+3. Implement each metric in tutorial notebooks and reusable Python modules.
 
-## Data sources
+The notebooks are written as self-contained walkthroughs: the core metric logic
+is visible in the notebook, while the package modules provide reusable versions
+for larger local datasets.
 
-| Source | Access | Used for |
-|---|---|---|
-| SkillCorner **Open Data** (10 matches, A-League) | Public — [github.com/SkillCorner/opendata](https://github.com/SkillCorner/opendata), auto-downloaded by the tutorials | Tutorials (`00_*_from_scratch.ipynb`) |
-| SkillCorner **K League** (full seasons) | Licensed — `/data2/MHL/data/skillcorner/kleague` | Analysis / post reproduction |
-| **Bepro** K League | Licensed — Google Drive via `rclone` | Analysis / post reproduction |
+## Quick Start
 
-Tutorials switch between sources with a `DATA_SOURCE` toggle; the default `"opendata"` is
-public and reproducible by everyone. The licensed K League / Bepro data are **not** public —
-only the open-data path is fully reproducible outside this machine.
-
-## Layout
-
-Each metric is a Python package — `xg/`, `xpass/`, `xthreat/`. Within each:
-
-| File pattern | Role |
-|---|---|
-| `*_features.py` | feature engineering |
-| `train_*.py` / `*_model.py` | models (logistic / XGBoost / LightGBM, or the xT surface) |
-| `*_plots.py` | plotting (mplsoccer pitches) |
-| `skillcorner_*.py`, `bepro_*.py` | data builders — **both vendors kept** |
-| `*_report.py` | script that regenerates a blog post's figures |
-| `notebooks/` | **exactly two per metric**: `00_*_from_scratch.ipynb` (open-data tutorial + simple analysis) and one report notebook that reproduces the published post's analyses |
-| `*_report.py` outputs | written under `reports/` — **gitignored** (regenerated on demand; published copies live on the KAISport site) |
-
-Shared: `football-cdf/` (submodule, imported as `football_cdf`), `pipelines/` (data
-pipelines that build the canonical stores — e.g. `pipelines/bepro_ingest.py` builds the
-Bepro **SPADL action store** the xG/xPass builders derive from), `animations/` (pitch
-animation helpers, used by tutorials/analysis as needed), `tmp/` (generated data — gitignored),
-`tools/` + `.secrets/` (rclone binary + config — gitignored).
-
-The Bepro pipeline is standardized on SPADL: `python -m pipelines.bepro_ingest` builds
-`tmp/data/bepro_spadl_k1/{actions,match_meta}.parquet` once (via the shared
-`football_cdf` Bepro→SPADL converter), and `xg/bepro_drive_shots.py` /
-`xpass/bepro_drive_passes.py` derive the shot / pass tables from it.
-
-## Blog post → producing code
-
-| Post | Producer | Data |
-|---|---|---|
-| `week1-xg` (Seoul xG story) | `xg/week1_report.py` (notebook `week1_xg_analysis.ipynb` reproduces it) | `tmp/data/bepro_drive_xg_k1` (Bepro) |
-| `week2-xpass` | `xpass/week2_report.py` | `tmp/data/skillcorner_xpass/passes.parquet` (SkillCorner **provided** xPass) |
-
-(For xPass, Bepro keeps only the pass builder `xpass/bepro_drive_passes.py` for future analysis;
-a publishable Bepro xPass model is future work — Bepro's realized next-touch leaks the outcome.)
-
-## Setup
-
-Clone with the `football-cdf` submodule, then create an isolated **Python ≥ 3.10**
-environment and install the package editable (with the extras you need:
-`models` = xgboost/lightgbm, `notebooks` = jupyter). Name the environment whatever
-you like — nothing in the repo depends on a specific env name.
+Clone the repository with the `football-cdf` submodule and install the package in
+an isolated Python 3.10+ environment.
 
 ```bash
-git clone --recursive <repo-url>          # pulls the football-cdf submodule too
-cd football-analytics
-# (cloned without --recursive?) git submodule update --init --recursive
+git clone --recursive <repo-url>
+cd open-football-analytics
 ```
 
-**Option A — uv (recommended):**
+If you cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+Using `uv`:
 
 ```bash
 uv venv --python 3.11 .venv
@@ -78,30 +43,77 @@ source .venv/bin/activate
 uv pip install -e ".[models,notebooks]"
 ```
 
-**Option B — conda:**
+Using conda:
 
 ```bash
-conda create -n football-analytics python=3.11 -y
-conda activate football-analytics
+conda create -n open-football-analytics python=3.11 -y
+conda activate open-football-analytics
 pip install -e ".[models,notebooks]"
 ```
 
-**Jupyter kernel** — the notebooks use the generic `python3` kernel, so they run
-under whatever environment you launch Jupyter from. Optionally register your env so
-it shows up by name in the kernel picker:
+## Tutorials
+
+| Topic | Notebook | What it shows |
+|---|---|---|
+| CDF preprocessing | `football-cdf/notebooks/provider_to_cdf.ipynb` | Convert provider raw data into the common tracking/event shape used downstream. |
+| xG | `xg/notebooks/xg_tutorial.ipynb` | Build a shot table, train compact and richer xG models, and compare smooth vs tree-based xG surfaces. |
+| xPass | `xpass/notebooks/xpass_tutorial.ipynb` | Build a pass table, train xPass models, compare against SkillCorner's benchmark, and compute PAx. |
+| xT | `xthreat/notebooks/xthreat_tutorial.ipynb` | Build pass/carry/shot actions, learn an xT grid, compare pass vs carry xT, and animate a carry. |
+
+## Example Analyses
+
+These public posts show the same metric ideas in analysis form:
+
+| Metric | Analysis |
+|---|---|
+| xG | [Week 1: xG analysis](https://kaisport.github.io/posts/week1-xg-en.html) |
+| xPass | [Week 2: xPass analysis](https://kaisport.github.io/posts/week2-xpass-en.html) |
+| xT | [Week 3: xT analysis](https://kaisport.github.io/posts/week3-xt-en.html) |
+
+## Repository Map
+
+| Path | Purpose |
+|---|---|
+| `football-cdf/` | Provider preprocessing utilities and the CDF tutorial notebook. |
+| `xg/` | Shot table construction, xG features, model training, and xG surface plotting. |
+| `xpass/` | Pass table construction, xPass features, model training, SkillCorner benchmark comparison, and PAx summaries. |
+| `xthreat/` | Action table helpers, xT grid/value-iteration model, route plots, summaries, and animation examples. |
+| `animations/` | Lightweight pitch animation helpers for exploratory review. |
+
+## Data
+
+The default reproducible path uses SkillCorner Open Data:
+
+<https://github.com/SkillCorner/opendata>
+
+The Open Data sample is small, so tutorial models are best treated as
+transparent, reproducible examples rather than final league-strength models. If
+you have your own licensed SkillCorner data, the same scripts and notebooks can
+be pointed at your local match-bundle root by changing the path or setting an
+environment variable.
 
 ```bash
-python -m ipykernel install --user --name football-analytics --display-name "football-analytics"
+export SKILLCORNER_ROOT=/path/to/skillcorner/matches
 ```
 
-## Tutorials (open data — reproducible by anyone)
+## Metric Workflows
 
-```text
-xg/notebooks/00_xg_from_scratch.ipynb            # available
-xpass/notebooks/00_xpass_from_scratch.ipynb      # available
-xthreat/notebooks/00_xthreat_from_scratch.ipynb  # available
-```
+### xG
 
-Each builds the metric from raw SkillCorner Dynamic Events, implements the features/model/
-evaluation inline, and then shows that it matches the production modules. Set
-`DATA_SOURCE = "opendata"` (the default) to run entirely on public data.
+`xg.skillcorner_shots` builds a shot table from SkillCorner Dynamic Events.
+`xg.xg_features` adds geometry and context features, and
+`xg.train_skillcorner_xg` trains logistic, XGBoost, or LightGBM models.
+
+### xPass
+
+`xpass.skillcorner_passes` builds a pass table from player-possession events.
+`xpass.xpass_features` adds pass geometry and context features, and
+`xpass.train_skillcorner_xpass` trains completion models and compares them with
+SkillCorner's provided xPass benchmark when the column is available.
+
+### xT
+
+`xthreat.skillcorner_actions` prepares pass/carry/shot action rows, and
+`xthreat.xthreat_model` contains a center-origin expected-threat model that
+learns a grid through value iteration. `xthreat.train_skillcorner_xthreat`
+scores actions and exports team/player summaries.

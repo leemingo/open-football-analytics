@@ -54,7 +54,7 @@ def _pass_xpass_column(source: str, *, custom_col: str = "model_xpass") -> str:
 
 def _default_subtitle(season_name: str | None, source: str) -> str:
     season = "All seasons" if season_name is None else str(season_name)
-    return f"K League | {season} | {_source_label(source)}"
+    return f"SkillCorner Open Data | {season} | {_source_label(source)}"
 
 
 def _draw_pitch(ax: plt.Axes) -> None:
@@ -314,7 +314,9 @@ def plot_passing_risk_profile(
     source_avg_col, source_pax_col = _source_columns(source)
     expected_col = expected_col or source_avg_col
     pax_col = pax_col or source_pax_col
-    subtitle = subtitle or _default_subtitle(season_name, source).replace("K League", "K League players")
+    subtitle = subtitle or _default_subtitle(season_name, source).replace(
+        "SkillCorner Open Data", "SkillCorner Open Data players"
+    )
     frame = _filter_player_frame(player_pax, min_passes=min_passes, season_name=season_name)
     for col in [expected_col, actual_col, pax_col]:
         if col not in frame.columns:
@@ -824,7 +826,7 @@ def plot_team_overrepresented_pass_clusters(
     season_text = "All seasons" if season_name is None else str(season_name)
     if subtitle is None:
         mode = "Final-third entries" if final_third_entries_only else "Open-play passes"
-        subtitle = f"Top {top_n} overrepresented pass clusters for each team | K League {season_text} | {mode}"
+        subtitle = f"Top {top_n} overrepresented pass clusters for each team | SkillCorner Open Data {season_text} | {mode}"
     fig.text(0.055, 0.975, title, fontsize=24, fontweight="bold", color="black", ha="left", va="top")
     fig.text(0.055, 0.94, subtitle, fontsize=13, color="black", ha="left", va="top")
     fig.legend(
@@ -919,7 +921,7 @@ def plot_team_pass_cluster_panels(
         title = f"How do {team_shortname} pass into the final third?" if final_third_entries_only else f"{team_shortname} pass cluster profile"
     if subtitle is None:
         mode = "final-third entries" if final_third_entries_only else "open-play passes"
-        subtitle = f"K League {season_text} | Ranked by {rank_by} | {mode}"
+        subtitle = f"SkillCorner Open Data {season_text} | Ranked by {rank_by} | {mode}"
     fig.text(0.055, 0.975, title, fontsize=22, fontweight="bold", color="black", ha="left", va="top")
     fig.text(0.055, 0.94, subtitle, fontsize=14, color="black", ha="left", va="top")
     fig.legend(

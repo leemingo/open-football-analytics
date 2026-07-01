@@ -8,7 +8,6 @@ from matplotlib.patches import Arc, Circle, Rectangle
 import numpy as np
 import pandas as pd
 
-from xthreat.xthreat_analysis import add_route_columns
 try:
     from football_cdf.constants import PITCH_X, PITCH_Y
 except ModuleNotFoundError:
@@ -27,6 +26,29 @@ ACTION_COLORS = {
     "carry": "#F28E2B",
     "shot": "#D9354A",
 }
+
+
+def add_route_columns(actions: pd.DataFrame) -> pd.DataFrame:
+    """Add route labels used by plotting helpers."""
+    frame = actions.copy()
+    if "route_channel" in frame.columns:
+        frame["route_channel"] = frame["route_channel"].fillna("unknown").astype(str)
+        return frame
+
+    y_cols = [col for col in ("start_y", "end_y") if col in frame.columns]
+    if not y_cols:
+        frame["route_channel"] = "unknown"
+        return frame
+
+    route_y = pd.concat([pd.to_numeric(frame[col], errors="coerce") for col in y_cols], axis=1).mean(axis=1)
+    abs_route_y = route_y.abs()
+    frame["route_channel"] = np.select(
+        [abs_route_y.le(PITCH_Y / 6), abs_route_y.le(PITCH_Y / 3)],
+        ["central", "half-space"],
+        default="wide",
+    )
+    frame.loc[route_y.isna(), "route_channel"] = "unknown"
+    return frame
 
 
 def draw_center_origin_pitch(ax: plt.Axes, *, line_color: str = "#8a8a8a", linewidth: float = 1.0) -> None:

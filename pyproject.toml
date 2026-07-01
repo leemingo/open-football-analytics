@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "football-analytics"
 version = "0.1.0"
-description = "K League football analytics experiments for xG, xPass, and xThreat."
+description = "Open football analytics experiments for xG, xPass, and xThreat."
 requires-python = ">=3.10"
 dependencies = [
     "joblib>=1.3",
