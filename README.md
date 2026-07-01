@@ -11,6 +11,12 @@ The repository is built around a simple workflow:
    Common Data Format (CDF), following
    [Anzer et al., "Common Data Format (CDF): A Standardized Format for
    Match-Data in Football (Soccer)"](https://arxiv.org/abs/2505.15820).
+   When provider events are converted into action-level tables, the action
+   type/result/body-part conventions follow
+   [SPADL](https://socceraction.readthedocs.io/en/latest/documentation/spadl/SPADL_definitions.html).
+   Sportec / DFL tracking is loaded and normalized with
+   [Kloppy](https://kloppy.pysport.org/), while SPADL-style action tables keep
+   the event layer close to [socceraction](https://socceraction.readthedocs.io/).
 2. Use the public [SkillCorner Open Data](https://github.com/SkillCorner/opendata)
    sample as the default reproducible dataset.
 3. Implement each metric in tutorial notebooks and reusable Python modules.
@@ -55,7 +61,7 @@ pip install -e ".[models,notebooks]"
 
 | Topic | Notebook | What it shows |
 |---|---|---|
-| CDF preprocessing | `football-cdf/notebooks/provider_to_cdf.ipynb` | Convert provider raw data into the common tracking/event shape used downstream. |
+| CDF preprocessing | `football-cdf/notebooks/provider_to_cdf.ipynb` | Convert provider raw data into the common tracking/event shape used downstream, including SPADL-style action tables where available. |
 | xG | `xg/notebooks/xg_tutorial.ipynb` | Build a shot table, train compact and richer xG models, and compare smooth vs tree-based xG surfaces. |
 | xPass | `xpass/notebooks/xpass_tutorial.ipynb` | Build a pass table, train xPass models, compare against SkillCorner's benchmark, and compute PAx. |
 | xT | `xthreat/notebooks/xthreat_tutorial.ipynb` | Build pass/carry/shot actions, learn an xT grid, compare pass vs carry xT, and animate a carry. |
@@ -74,7 +80,7 @@ These public posts show the same metric ideas in analysis form:
 
 | Path | Purpose |
 |---|---|
-| `football-cdf/` | Provider preprocessing utilities and the CDF tutorial notebook. |
+| `football-cdf/` | Provider preprocessing utilities, CDF tracking/event conversion, SPADL-style action conversion, and the CDF tutorial notebook. |
 | `xg/` | Shot table construction, xG features, model training, and xG surface plotting. |
 | `xpass/` | Pass table construction, xPass features, model training, SkillCorner benchmark comparison, and PAx summaries. |
 | `xthreat/` | Action table helpers, xT grid/value-iteration model, route plots, summaries, and animation examples. |
