@@ -2,9 +2,10 @@
 
 Open, reproducible football analytics tutorials and utilities built on public
 event and tracking data. The current examples cover **expected Goals (xG)**,
-**expected Pass (xPass)**, **expected Threat (xT)**, and **VAEP** (valuing every
-on-the-ball action), with the project designed to grow into a broader collection
-of football metrics.
+**expected Pass (xPass)**, **expected Threat (xT)**, **VAEP** (valuing every
+on-the-ball action), and **physical metrics** (speed bands, sustained efforts, and
+ball-in-play-normalised running), with the project designed to grow into a broader
+collection of football metrics.
 
 The repository is built around a simple workflow:
 
@@ -67,7 +68,8 @@ pip install -e ".[models,notebooks]"
 | xG | `xg/notebooks/xg_tutorial.ipynb` | Build a shot table, train compact and richer xG models, and compare smooth vs tree-based xG surfaces. |
 | xPass | `xpass/notebooks/xpass_tutorial.ipynb` | Build a pass table, train xPass models, compare against SkillCorner's benchmark, and compute PAx. |
 | xT | `xthreat/notebooks/xthreat_tutorial.ipynb` | Build pass/carry/shot actions, learn an xT grid, compare pass vs carry xT, and animate a carry. |
-| VAEP | `vaep/notebooks/vaep_tutorial.ipynb` | Build a SPADL action table from DFL/Sportec open data, train P(scores)/P(concedes), and value every action (offensive + defensive). |
+| VAEP | `vaep/notebooks/vaep_tutorial.ipynb` | Build a SPADL action table from StatsBomb open data, train P(scores)/P(concedes), and value every action (offensive + defensive). |
+| Physical | `physical/notebooks/physical_tutorial.ipynb` | Turn raw tracking coordinates into speed bands, sustained efforts, PSV-99, and ball-in-play-normalised distance, then rank players. |
 
 ## Example Analyses
 
@@ -78,6 +80,8 @@ These public posts show the same metric ideas in analysis form:
 | xG | [Week 1: xG analysis](https://kaisport.github.io/posts/week1-xg-en.html) |
 | xPass | [Week 2: xPass analysis](https://kaisport.github.io/posts/week2-xpass-en.html) |
 | xT | [Week 3: xT analysis](https://kaisport.github.io/posts/week3-xt-en.html) |
+| VAEP | [Week 4: VAEP analysis](https://kaisport.github.io/posts/week4-vaep-en.html) |
+| Physical | [Week 5: physical metrics analysis](https://kaisport.github.io/posts/week5-physical-en.html) |
 
 ## Repository Map
 
@@ -87,7 +91,8 @@ These public posts show the same metric ideas in analysis form:
 | `xg/` | Shot table construction, xG features, model training, and xG surface plotting. |
 | `xpass/` | Pass table construction, xPass features, model training, SkillCorner benchmark comparison, and PAx summaries. |
 | `xthreat/` | Action table helpers, xT grid/value-iteration model, route plots, summaries, and animation examples. |
-| `vaep/` | SPADL action table from DFL/Sportec open data, VAEP features/labels, the two-head P(scores)/P(concedes) model, the VAEP formula, and per-player action-value ratings. |
+| `vaep/` | SPADL action table from StatsBomb open data, VAEP features/labels, the two-head P(scores)/P(concedes) model, the VAEP formula, and per-player action-value ratings. |
+| `physical/` | Tracking download/streaming, speed and acceleration estimation, speed bands and sustained efforts, PSV-99, TIP/OTIP splits, ball-in-play normalisation, and player leaderboards. |
 | `animations/` | Lightweight pitch animation helpers for exploratory review. |
 
 ## Data
@@ -106,20 +111,31 @@ environment variable.
 export SKILLCORNER_ROOT=/path/to/skillcorner/matches
 ```
 
-### VAEP data (DFL/Sportec open data)
+### VAEP data (StatsBomb open data)
 
 VAEP needs a typed **action stream**, which SkillCorner Open Data does not provide,
-so the VAEP tutorial uses the public **DFL/IDSSE** open dataset (7 Bundesliga
-2022/23 matches, CC-BY) — the same open data as `kloppy.sportec.load_open_*` —
-converted to SPADL-style actions with `football-cdf`'s Sportec preprocessor and
-downloaded automatically by `vaep.sportec_actions`.
+so the VAEP tutorial uses the public **StatsBomb Open Data** (FIFA World Cup 2022,
+64 matches), converted to SPADL-style actions with `football-cdf`'s StatsBomb
+preprocessor and downloaded automatically by `vaep.statsbomb_actions`.
 
-**Limitation — no carries.** DFL open events are *point* events: one location per
-event, with no end/receiver coordinate. A moving action's end is therefore
-reconstructed as the next recorded on-ball location, and **explicit carry/dribble
-actions are not produced** — ball-carrying value is folded into the (linked) pass
-end. Feeds that record end locations (e.g. Bepro, StatsBomb) do support separate
-carries; the K-League analysis in `kleague-insights`, built on Bepro, keeps them.
+### Physical data (SkillCorner Open Data tracking)
+
+Physical metrics need **tracking**, not events, so the physical tutorial reads the
+`*_tracking_extrapolated.jsonl` files from the same SkillCorner Open Data sample
+(10 A-League 2024/25 matches at 10 Hz). Those files are stored with **Git LFS**
+(~90 MB per match, ~915 MB for all ten) and must be fetched from the
+`media.githubusercontent.com` endpoint — `raw.githubusercontent.com` returns a
+~133-byte pointer file. `physical.skillcorner_tracking` handles this and verifies
+each download against the remote `Content-Length`:
+
+```bash
+python -m physical.build_skillcorner_physical --download
+```
+
+**Limitation — extrapolated positions.** Whenever the ball is tracked the full XI on
+both sides is present, but only about 60% of those positions are *detected*; the rest
+are model estimates, and the detected share varies by match and by position. See
+`physical/README.md` for what that does and does not license you to conclude.
 
 ## Metric Workflows
 
@@ -145,12 +161,23 @@ scores actions and exports team/player summaries.
 
 ### VAEP
 
-`vaep.sportec_actions` downloads the DFL/IDSSE open data and builds a SPADL action
-table (via the `football_cdf` Sportec chain → typed actions; end coordinates are
-reconstructed from the next event because DFL events are point events, so **no
-separate carry actions** — see **Data**). `vaep.vaep_features` builds
+`vaep.statsbomb_actions` downloads the StatsBomb open data and builds a SPADL action
+table via the `football_cdf` StatsBomb chain. `vaep.vaep_features` builds
 socceraction-style game-state features, `vaep.vaep_labels` marks whether the team
 scores/concedes within the next actions, and `vaep.vaep_model` trains the two
 P(scores)/P(concedes) heads. `vaep.vaep_formula` combines them into offensive +
-defensive action value, and `vaep.train_sportec_vaep` scores actions and exports
+defensive action value, and `vaep.train_statsbomb_vaep` scores actions and exports
 per-player ratings.
+
+### Physical
+
+`physical.skillcorner_tracking` downloads the Open Data tracking files and streams
+each match's JSONL into a canonical long tracking frame plus a lineup table.
+`physical.kinematics` segments the signal, estimates velocity and acceleration, and
+flags physiologically impossible samples without clipping them.
+`physical.physical_features` turns that into speed-band distances, sustained efforts,
+PSV-99, TIP/OTIP splits, and per-60-ball-in-play-minute rates.
+`physical.normalize` holds the eligibility and aggregation rules,
+`physical.explosiveness` reconstructs time-to-speed after accelerations and direction
+changes, and `physical.build_skillcorner_physical` runs the match loop and writes
+season profiles. Every threshold is defined in `physical.definitions`.

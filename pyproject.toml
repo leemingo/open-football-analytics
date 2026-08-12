@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "football-analytics"
 version = "0.1.0"
-description = "Open football analytics experiments for xG, xPass, and xThreat."
+description = "Open football analytics experiments for xG, xPass, xThreat, VAEP, and physical metrics."
 requires-python = ">=3.10"
 dependencies = [
     "joblib>=1.3",
@@ -32,4 +32,4 @@ notebooks = [
 
 [tool.setuptools.packages.find]
 where = [".", "football-cdf"]
-include = ["animations*", "football_cdf*", "xg*", "xpass*", "xthreat*"]
+include = ["animations*", "football_cdf*", "physical*", "vaep*", "xg*", "xpass*", "xthreat*"]
