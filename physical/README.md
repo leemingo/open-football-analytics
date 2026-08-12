@@ -1,4 +1,4 @@
-# Physical
+# Physical Metrics
 
 Tracking-derived **physical metrics** — distance, speed bands, sprints, accelerations,
 PSV-99, and in/out-of-possession splits — built from SkillCorner Open Data.
@@ -99,23 +99,6 @@ Two diagnostic percentages come out of the same file and are **not** interchange
 
 They differ because the camera follows live play, so live frames carry more tracked
 players than dead ones. Both are recorded in `coverage.parquet`.
-
-## Tracking Quality
-
-Measured on this sample rather than assumed:
-
-- Owner-labelled live frames contain about **21.3–21.7 player rows per frame** at 10 Hz;
-  the remaining rows are absent from the source rather than treated as live by inference.
-  The often-quoted ~73% "coverage" of match time is largely dead-ball time, which is why
-  coverage is **reported and not used as an eligibility filter** here.
-- About **40% of player positions are extrapolated** rather than detected (51–66% detected
-  across the ten matches, far lower for goalkeepers). That, not missing rows, is the real
-  quality limit of a broadcast feed.
-- Detected share is confounded with role and involvement — players nearer the ball are
-  better detected — and the correlation with metrics **flips sign** between match-level
-  and performance-level aggregation. This package therefore reports detection quality and
-  claims no bias direction; identifying one needs a within-player design a ten-match
-  sample cannot support.
 
 ## Eligibility
 
