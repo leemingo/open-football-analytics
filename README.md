@@ -132,10 +132,6 @@ each download against the remote `Content-Length`:
 python -m physical.build_skillcorner_physical --download
 ```
 
-**Limitation — extrapolated positions.** Whenever the ball is tracked the full XI on
-both sides is present, but only about 60% of those positions are *detected*; the rest
-are model estimates, and the detected share varies by match and by position. See
-`physical/README.md` for what that does and does not license you to conclude.
 
 ## Metric Workflows
 
